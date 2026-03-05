@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Inventário de Publicações</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+
+*{
+box-sizing:border-box;
+margin:0;
+padding:0;
+font-family:Arial;
+}
+
+body{
+background:#eef2f7;
+padding:20px;
+}
+
+header{
+background:linear-gradient(90deg,#2f5fa7,#4a7cc2);
+color:white;
+padding:18px;
+border-radius:12px;
+margin-bottom:20px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+flex-wrap:wrap;
+}
+
+header h1{
+font-size:20px;
+}
+
+button{
+padding:10px;
+background:linear-gradient(90deg,#2f5fa7,#4a7cc2);
+color:white;
+border:none;
+border-radius:6px;
+cursor:pointer;
+}
+
+button:hover{
+opacity:0.9;
+}
+
+.container{
+display:grid;
+grid-template-columns:320px 320px 1fr;
+gap:20px;
+}
+
+@media(max-width:1100px){
+
+.container{
+grid-template-columns:1fr 1fr;
+}
+
+}
+
+@media(max-width:700px){
+
+.container{
+grid-template-columns:1fr;
+}
+
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:12px;
+box-shadow:0 3px 8px rgba(0,0,0,0.08);
+}
+
+input,select{
+width:100%;
+padding:10px;
+margin-top:8px;
+margin-bottom:10px;
+border-radius:6px;
+border:1px solid #ccc;
+}
+
+.lista{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+gap:15px;
+}
+
+.pub{
+background:white;
+padding:10px;
+border-radius:10px;
+box-shadow:0 2px 6px rgba(0,0,0,0.1);
+text-align:center;
+}
+
+.pub img{
+width:100%;
+height:140px;
+object-fit:cover;
+border-radius:6px;
+}
+
+.qtd{
+font-size:18px;
+font-weight:bold;
+color:#2f5fa7;
+}
+
+.acoes{
+display:flex;
+gap:5px;
+margin-top:8px;
+}
+
+.acoes button{
+flex:1;
+font-size:12px;
+padding:6px;
+}
+
+#resultado{
+font-size:32px;
+font-weight:bold;
+text-align:center;
+margin:10px;
+color:#2f5fa7;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<h1>SISTEMA DE INVENTÁRIO DE PUBLICAÇÕES</h1>
+
+<button onclick="gerarPDF()">Gerar Relatório</button>
+
+</header>
+
+<div class="container">
+
+
+<div class="card">
+
+<h3>Cadastro de Publicação</h3>
+
+<input id="codigo" placeholder="Código (opcional)">
+
+<input id="nome" placeholder="Nome da publicação">
+
+<select id="tipo">
+
+<option>Folheto</option>
+<option>Revista</option>
+<option>Brochura</option>
+<option>Livreto</option>
+<option>Livro</option>
+<option>Bíblia Grande</option>
+<option>Bíblia Média</option>
+<option>Bíblia Pequena</option>
+
+</select>
+
+<input id="capa" placeholder="Link da imagem da capa (opcional)">
+
+<input id="quantidadeManual" placeholder="Quantidade manual">
+
+<input id="baseQtd" placeholder="Quantidade base">
+
+<input id="baseMm" placeholder="mm base">
+
+<button onclick="cadastrar()">Cadastrar</button>
+
+</div>
+
+
+
+<div class="card">
+
+<h3>Contagem com Paquímetro</h3>
+
+<select id="selectPub"></select>
+
+<input id="mm" placeholder="Medição no Paquímetro">
+
+<button onclick="calcular()">Calcular</button>
+
+<div id="resultado">0</div>
+
+<button onclick="salvar()">Adicionar ao Inventário</button>
+
+</div>
+
+
+
+<div class="card">
+
+<h3>Publicações Cadastradas</h3>
+
+<input id="pesquisa" placeholder="Pesquisar">
+
+<div class="lista" id="lista"></div>
+
+</div>
+
+
+</div>
+
+
+<script>
+
+let publicacoes = JSON.parse(localStorage.getItem("publicacoes")) || []
+
+let editando = null
+
+
+function salvarDados(){
+
+localStorage.setItem("publicacoes",JSON.stringify(publicacoes))
+
+}
+
+
+function cadastrar(){
+
+let pub={
+
+codigo:codigo.value||"Sem código",
+nome:nome.value||"Sem nome",
+tipo:tipo.value,
+capa:capa.value,
+baseQtd:Number(baseQtd.value),
+baseMm:Number(baseMm.value),
+qtd:Number(quantidadeManual.value)||0
+
+}
+
+if(editando!=null){
+
+publicacoes[editando]=pub
+editando=null
+
+}else{
+
+publicacoes.push(pub)
+
+}
+
+salvarDados()
+
+render()
+atualizarSelect()
+limpar()
+
+}
+
+
+function editar(i){
+
+let p=publicacoes[i]
+
+codigo.value=p.codigo
+nome.value=p.nome
+tipo.value=p.tipo
+capa.value=p.capa
+quantidadeManual.value=p.qtd
+baseQtd.value=p.baseQtd
+baseMm.value=p.baseMm
+
+editando=i
+
+}
+
+
+function excluir(i){
+
+if(confirm("Excluir publicação?")){
+
+publicacoes.splice(i,1)
+
+salvarDados()
+
+render()
+atualizarSelect()
+
+}
+
+}
+
+
+function limpar(){
+
+codigo.value=""
+nome.value=""
+capa.value=""
+quantidadeManual.value=""
+baseQtd.value=""
+baseMm.value=""
+
+}
+
+
+function atualizarSelect(){
+
+selectPub.innerHTML="<option value=''>Selecionar</option>"
+
+publicacoes.forEach((p,i)=>{
+
+let o=document.createElement("option")
+
+o.value=i
+o.text=p.codigo+" - "+p.nome
+
+selectPub.appendChild(o)
+
+})
+
+}
+
+
+function calcular(){
+
+let i=selectPub.value
+
+if(i==="")return
+
+let p=publicacoes[i]
+
+if(!p.baseQtd||!p.baseMm){
+
+alert("Essa publicação não possui base de cálculo.")
+return
+
+}
+
+let fator=p.baseQtd/p.baseMm
+
+resultado.innerText=Math.round(mm.value*fator)
+
+}
+
+
+function salvar(){
+
+let i=selectPub.value
+
+if(i==="")return
+
+publicacoes[i].qtd+=Number(resultado.innerText)
+
+salvarDados()
+
+render()
+
+}
+
+
+function render(){
+
+lista.innerHTML=""
+
+let termo=pesquisa.value?.toLowerCase()||""
+
+publicacoes
+.filter(p=>p.nome.toLowerCase().includes(termo)||p.codigo.toLowerCase().includes(termo))
+.forEach((p,i)=>{
+
+let d=document.createElement("div")
+
+d.className="pub"
+
+d.innerHTML=`
+
+<img src="${p.capa||'https://via.placeholder.com/150'}">
+
+<h4>${p.codigo}</h4>
+
+<p>${p.nome}</p>
+
+<div class="qtd">${p.qtd} unidades</div>
+
+<div class="acoes">
+
+<button onclick="editar(${i})">Editar</button>
+
+<button onclick="excluir(${i})">🗑</button>
+
+</div>
+
+`
+
+lista.appendChild(d)
+
+})
+
+}
+
+pesquisa.addEventListener("input",render)
+
+
+
+function gerarPDF(){
+
+if(publicacoes.length==0){
+
+alert("Nenhuma publicação cadastrada.")
+return
+
+}
+
+const { jsPDF } = window.jspdf
+
+let doc=new jsPDF()
+
+let y=20
+let total=0
+
+doc.setFontSize(18)
+doc.text("INVENTÁRIO DE PUBLICAÇÕES",20,y)
+
+y+=10
+
+doc.setFontSize(11)
+doc.text("Data: "+new Date().toLocaleDateString(),20,y)
+
+y+=10
+
+doc.text("CÓDIGO",20,y)
+doc.text("QUANTIDADE",120,y)
+
+y+=5
+doc.line(20,y,180,y)
+
+y+=8
+
+publicacoes.forEach(p=>{
+
+doc.text(p.codigo,20,y)
+doc.text(String(p.qtd),120,y)
+
+total+=p.qtd
+
+y+=8
+
+})
+
+y+=5
+
+doc.line(20,y,180,y)
+
+y+=10
+
+doc.setFontSize(13)
+doc.text("TOTAL GERAL: "+total,20,y)
+
+doc.save("inventario_publicacoes.pdf")
+
+}
+
+
+render()
+atualizarSelect()
+
+</script>
+
+</body>
+</html>
